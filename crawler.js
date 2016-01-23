@@ -6,7 +6,7 @@ var express = require('express');
 var app = express();
 
 var START_URL = "http://www.kayac.com";
-var MAX_PAGES_TO_VISIT = 1000;
+var MAX_DEPTH = 10;
 
 var pagesVisited = {};
 var kanji = {};
@@ -18,49 +18,52 @@ var baseUrl = url.protocol + "//" + url.hostname;
 const PORT=8080; 
 
 pagesToVisit.push(START_URL);
-crawl();
+pagesVisited.push
+crawl(START_URL, 0);
+initServer();
 
-app.get('/', function(request, response){
-	var sorted = [];
-	for (var cc in kanji){
-		sorted.push([cc, kanji[cc]]);
-	}
-	sorted.sort(function(a, b){ return b[1] - a[1]});
+function initServer(){
+	app.get('/', function(request, response){
+		var sorted = [];
+		for (var cc in kanji){
+			sorted.push([cc, kanji[cc]]);
+		}
+		sorted.sort(function(a, b){ return b[1] - a[1]});
 
-	kanji = {};
-	for (var i = 0; i < sorted.length; ++i){
-		kanji[sorted[i][0]]= sorted[i][1];
-	}
+		kanji = {};
+		for (var i = 0; i < sorted.length; ++i){
+			kanji[sorted[i][0]]= sorted[i][1];
+		}
 
-	response.header("Content-Type", "application/json; charset=utf-8");
-    response.write(JSON.stringify(kanji), 'utf8');
-    response.end();
+		response.header("Content-Type", "application/json; charset=utf-8");
+	    response.write(JSON.stringify(kanji), 'utf8');
+	    response.end();
 
-    console.log("Handling request, size of sorted: " + sorted.length);
-});
+	    console.log("Handling request, size of sorted: " + sorted.length);
+	});
 
-var server = app.listen(PORT, function(){
-    //Callback triggered when server is successfully listening. Hurray!
-    console.log("Server listening on: http://localhost:%s", PORT);
-});
+	var server = app.listen(PORT, function(){
+	    //Callback triggered when server is successfully listening. Hurray!
+	    console.log("Server listening on: http://localhost:%s", PORT);
+	});
+}
 
 
-function crawl() {
-  if(numPagesVisited >= MAX_PAGES_TO_VISIT) {
-    console.log("Reached max limit of number of pages to visit.");
+
+
+function crawl(url, depth) {
+  if(depth >= MAX_DEPTH){
+    //console.log("Reached max limit of number of pages to visit.");
     return;
-  }
-  var nextPage = pagesToVisit.pop();
-  if (nextPage in pagesVisited) {
-    // We've already visited this page, so repeat the crawl
-    crawl();
+  } else
+  if (url in pagesVisited){
+  	return;
   } else {
-    // New page we haven't visited
-    visitPage(nextPage, crawl);
+  	visitPage(url,crawl,depth+1);
   }
 }
 
-function visitPage(url, callback) {
+function visitPage(url, callback, depth) {
 	// Add page to our set
 	pagesVisited[url] = true;
 	numPagesVisited++;
@@ -69,16 +72,27 @@ function visitPage(url, callback) {
 	console.log("Visiting page " + url);
 	request(url, function(error, response, body) {
 		// Check status code (200 is HTTP OK)
-		console.log("Status code: " + response.statusCode);
-		if(response.statusCode !== 200) {
-			callback();
+		//console.log("Status code: " + response.statusCode);
+		if(!response || !response.statusCode || response.statusCode !== 200) {
 			return;
 		}
 	    // Parse the document body
 	    var $ = cheerio.load(body);
 	    processKanji($);
-	    collectInternalLinks($);
-	    callback();
+
+	    if (depth < MAX_DEPTH){
+	    	var nextPages = [];
+		    collectInternalLinks($, nextPages);
+
+		    console.log("next pages link: " + nextPages.length);
+		    for (var i = 0; i < nextPages.length; i++){
+		    	var f = function(j){
+		    		callback(nextPages[j], depth+1);
+		    	};
+
+		    	setTimeout(f(i), 100);
+		    }
+	    }
 	});
 }
 
@@ -99,11 +113,11 @@ function processKanji($) {
 	}
 }
 
-function collectInternalLinks($) {
+function collectInternalLinks($, nextPages) {
     var relativeLinks = $("a[href^='/']");
     console.log("Found " + relativeLinks.length + " relative links on page");
     relativeLinks.each(function() {
-		pagesToVisit.push(baseUrl + $(this).attr('href'));
+		nextPages.push(baseUrl + $(this).attr('href'));
     });
 }
 
