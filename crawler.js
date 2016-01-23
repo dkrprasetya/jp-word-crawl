@@ -17,6 +17,9 @@ var baseUrl = url.protocol + "//" + url.hostname;
 
 const PORT=8080; 
 
+pagesToVisit.push(START_URL);
+crawl();
+
 app.get('/', function(request, response){
 	var sorted = [];
 	for (var cc in kanji){
@@ -36,20 +39,11 @@ app.get('/', function(request, response){
     console.log("Handling request, size of sorted: " + sorted.length);
 });
 
-work();
+var server = app.listen(PORT, function(){
+    //Callback triggered when server is successfully listening. Hurray!
+    console.log("Server listening on: http://localhost:%s", PORT);
+});
 
-
-
-
-function work() {
-	pagesToVisit.push(START_URL);
-	crawl();
-
-	var server = app.listen(PORT, function(){
-	    //Callback triggered when server is successfully listening. Hurray!
-	    console.log("Server listening on: http://localhost:%s", PORT);
-	});
-}
 
 function crawl() {
   if(numPagesVisited >= MAX_PAGES_TO_VISIT) {
